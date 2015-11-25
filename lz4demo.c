@@ -81,7 +81,8 @@ static inline unsigned int swap32(unsigned int x) {
 
 #define CHUNKSIZE (8<<20)    // 8 MB
 #define CACHELINE 64
-#define ARCHIVE_MAGICNUMBER 0x184C2102
+#define ARCHIVE_MAGICNUMBER     0x184C2102
+#define ARCHIVE_MAGICNUMBER_END 0x02214C18
 #define ARCHIVE_MAGICNUMBER_SIZE 4
 
 
@@ -205,7 +206,12 @@ int compress_file(char* input_filename, char* output_filename, int compressionle
 		int outSize;
 		// Read Block
 	    int inSize = fread(in_buff, 1, CHUNKSIZE, finput);
-		if( inSize<=0 ) break;
+		if( inSize<=0 ){
+			* (unsigned int*) out_buff = 0x02214C18;
+			LITTLE_ENDIAN32(outSize);
+			fwrite(out_buff, 1, 4, foutput);
+			break;
+		}
 		filesize += inSize;
 		if (displayLevel) DISPLAY("Read : %i MB  \r", (int)(filesize>>20));
 
@@ -277,7 +283,10 @@ int decode_file(char* input_filename, char* output_filename)
 		uselessRet = fread(&chunkSize, 1, 4, finput);
 		if( uselessRet==0 ) break;   // Nothing to read : file read is completed
 		LITTLE_ENDIAN32(chunkSize);
-		if (chunkSize == ARCHIVE_MAGICNUMBER) 
+		if (chunkSize == ARCHIVE_MAGICNUMBER_END){
+			break;
+		}
+		else if (chunkSize == ARCHIVE_MAGICNUMBER)
 			continue;   // appended compressed stream
 		
 		// Read Block
